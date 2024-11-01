@@ -11,6 +11,33 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use('/assets/products', express.static(path.join(__dirname, 'assets/products')));
 
+// Configure multer for file uploads
+// const storage = multer.diskStorage({
+//     destination: (req, file, cb) => {
+//         cb(null, 'uploads/');
+//     },
+//     filename: (req, file, cb) => {
+//         cb(null, Date.now() + path.extname(file.originalname));
+//     }
+// });
+
+// const upload = multer({ storage: storage });
+
+app.post('/accounts', (req, res) => {
+    console.log('Request body:', req.body); // Log the request body
+    const { name, password } = req.body;
+    const query = "INSERT INTO account (name, password) VALUES (?, ?)";
+    connection.query(query, [name, password], (err, result) => {
+        if (err) {
+            console.error('Error inserting account:', err); // Log the error
+            res.status(500).send('Error inserting account');
+            return;
+        }
+        res.status(201).send('Account created successfully');
+    });
+});
+
+
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
@@ -59,6 +86,60 @@ app.get('/products', (req, res) => {
         res.json(results);
     });
 });
+
+
+app.patch('/accounts/:id/password', (req, res) => {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+
+    if (!newPassword) {
+        return res.status(400).json({ error: 'New password is required' });
+    }
+
+    const checkQuery = "SELECT * FROM account WHERE id = ?";
+    connection.query(checkQuery, [id], (err, results) => {
+        if (err) {
+            console.error('Error checking account:', err);
+            return res.status(500).json({ error: 'Error checking account' });
+        }
+
+        if (results.length === 0) {
+            return res.status(404).json({ error: 'Account not found' });
+        }
+
+        const updateQuery = "UPDATE account SET password = ? WHERE id = ?";
+        connection.query(updateQuery, [newPassword, id], (err, result) => {
+            if (err) {
+                console.error('Error updating password:', err);
+                return res.status(500).json({ error: 'Error updating password' });
+            }
+
+            res.json({ message: 'Password updated successfully' });
+        });
+    });
+});
+
+
+app.get('/accounts/login', (req, res) => {
+    const { name, password } = req.query;
+    console.log(`Received login request for name: ${name}, password: ${password}`); // Ghi nhật ký
+    const query = "SELECT * FROM account WHERE name = ? AND password = ?";
+    connection.query(query, [name, password], (err, result) => {
+        if (err) {
+            console.error('Error fetching account:', err);
+            return res.status(500).json({ error: 'Error fetching account' });
+        }
+
+        if (result.length === 0) {
+            return res.status(404).json({ error: 'Account not found' });
+        }
+
+        res.json(result[0]);
+    });
+});
+
+
+
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
